@@ -35,9 +35,8 @@ Many virtual threads share a small number of OS threads.
 - Why Virtual Threads Were Needed:  
 Using thread for DB
 
-**Traditional Approach:** 
+**Traditional Approach:**  
 
-```text
 Thread
    |
    |---- waiting for DB Response (idle)
