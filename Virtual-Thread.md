@@ -61,13 +61,15 @@ The JVM suspends the virtual thread and reuses the platform thread for another t
 - Virtual Thread Architecture:
 
     1. Platform Thread (Managed by Operating System):  
+    ```java
     Java Thread
         |
     Operating System Thread  
-
+    ```
     Heavyweight.
 
     2. Virtual Thread (Managed by JVM Scheduler):  
+    ```java
     Virtual Thread
         |
         V
@@ -76,7 +78,7 @@ The JVM suspends the virtual thread and reuses the platform thread for another t
     Carrier Thread
         |
     OS Thread  
-    
+    ```
     The actual OS thread executing virtual threads is known as a Carrier Thread.  
 
 
