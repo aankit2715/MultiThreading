@@ -512,7 +512,122 @@ pool-1-thread-1 : 2128527197
 ```  
 In above example, we just need to make getInstance() thread safe and will able to achive threads safe singleton pattern.
 
-# 7.
+# 7. Rate Limiter with Token Bucket:
+- **Requirements**
+	- Maximum N requests allowed.
+	- Tokens refill at a fixed rate.
+	- Multiple threads can call allowRequest() concurrently.
+	- No race conditions.
+	
+- **capacity** → Maximum tokens bucket can hold.
+- **refillRatePerSecond** → Number of tokens added every second.
+- **tokens** → Current available tokens.
+- **lastRefillTime** → Timestamp used to calculate how many new tokens should be added since the previous refill.
+
+```java
+package com.test;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
+
+class TokenBucketRateLimiter {
+	
+	
+	private final long capacity;
+	private final long refillRatePerSec;
+	
+	private double token;
+	private long lastRefillTime;
+	
+	private final ReentrantLock lock = new ReentrantLock();
+	
+	public TokenBucketRateLimiter(long capacity, long refillRate) {
+		this.capacity = capacity;
+		this.refillRatePerSec = refillRate;
+		this.token = capacity;
+		this.lastRefillTime = System.nanoTime();
+		
+	}
+	
+	public boolean allowRequest() throws InterruptedException {
+		lock.lock();
+		try {
+			Thread.sleep(200);
+			refill();
+			if(token >= 1) {
+				token--;
+				return true;
+			}
+		} finally {
+			lock.unlock();
+		}
+		
+		return false;
+	}
+	
+	public void refill() {
+		
+		long now = System.nanoTime();		
+		long timePassed = (now - lastRefillTime)/1000000000;
+		
+		long newToken = timePassed * refillRatePerSec;
+		
+		if(newToken > 0) {
+			token = Math.min(capacity, token+newToken);
+			lastRefillTime = now;
+		}
+	}
+	
+}
+
+public class RateLimiterExample {
+	
+	public static void main(String[] args) {
+		
+		TokenBucketRateLimiter tbr = new TokenBucketRateLimiter(10, 2);
+		
+		ExecutorService executor = Executors.newFixedThreadPool(5);
+		
+		for(int i=0; i<5; i++) {
+			executor.submit(()-> {
+				while(true) {
+					try {
+						if(tbr.allowRequest())
+							System.out.println("Request allowed of " + Thread.currentThread().getName());
+						else
+							System.out.println("Request not allowed of " + Thread.currentThread().getName());
+					} catch(Exception e) {}
+				}		 
+			});
+		}
+		
+		executor.shutdown();
+		 
+	}
+
+}
+
+Posible Output:
+Request allowed of pool-1-thread-3
+Request allowed of pool-1-thread-5
+Request not allowed of pool-1-thread-1
+Request not allowed of pool-1-thread-2
+Request not allowed of pool-1-thread-4
+Request allowed of pool-1-thread-3
+Request allowed of pool-1-thread-5
+Request not allowed of pool-1-thread-1
+Request not allowed of pool-1-thread-2
+Request not allowed of pool-1-thread-4
+Request allowed of pool-1-thread-3
+			|
+			|
+			|
+			|
+			|
+			
+```
+
 # 8.
 # 9.
 
