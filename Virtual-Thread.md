@@ -36,22 +36,24 @@ Many virtual threads share a small number of OS threads.
 Using thread for DB
 
 **Traditional Approach:**  
-
+```java
 Thread
    |
    |---- waiting for DB Response (idle)
    |
    V
 OS thread remains blocked and cannot do other work.
+```
 
 ** With Virtual Threads:** 
+```java
 Virtual Thread
      |
      |---- waiting
      |
      V
 JVM parks virtual thread
-
+```  
 Platform thread becomes free  
 
 The JVM suspends the virtual thread and reuses the platform thread for another task. This dramatically increases scalability.  
