@@ -1,4 +1,4 @@
-# Reentrant Lock:
+# 1. Reentrant Lock:
 - Producer waits on notFull when the buffer is full.
 - Consumer waits on notEmpty when the buffer is empty.
 - Producer signals notEmpty after producing.
@@ -127,7 +127,7 @@ public class ReentrantLockExample {
 ```
 
 
-# Blocking Queue:
+# 2. Blocking Queue:
 
 ```java
 package com.test;
@@ -178,5 +178,185 @@ public class BlockingQueueExample {
 	}
 
 }
+```
+
+# 3. Wait() and Notify():
+
+```java
+package com.test;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+class Buffer {
+	
+	private int data;
+	private boolean flag = false; //  false: Empty and true: Data
+	
+	public synchronized void produce(int value) throws Exception {
+		
+		while(flag)
+			wait();
+		
+		data = value;
+		System.out.println("Produced Data: " + value + " by " + Thread.currentThread().getName());
+		flag = true;
+		notifyAll();			
+	}
+	
+	public synchronized void consume() throws Exception {
+		
+		while(!flag)
+			wait();
+		
+		System.out.println("Consumed Data: " + data + " by " + Thread.currentThread().getName());
+		flag = false;
+		notify();
+	}
+	
+}
+
+
+public class NotifyAllExample {
+
+     public static void main(String[] args) throws Exception{
+    	 
+    	 Buffer bf = new Buffer();
+    	 
+    	 ExecutorService executor = Executors.newFixedThreadPool(5);
+    	 
+    	 //Producer 1
+    	 executor.submit(() -> {
+    		 
+    		 for(int i=1; i<=10; i++) {
+    			 try {
+					bf.produce(i);
+					Thread.sleep(2000);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					System.out.println("Error while processing producer " + Thread.currentThread().getName());
+				}
+    		 }
+ 				 
+    	 });
+    	 
+ 
+    	 // Consumer 1
+    	 executor.submit(()-> consumer(bf));
+    	 executor.submit(()-> consumer(bf));
+    	 executor.submit(() -> consumer(bf));
+    	 executor.submit(() -> consumer(bf));
+    	 
+    	 executor.shutdown();
+    	 
+    	 
+     }
+     
+     public static void consumer(Buffer buffer) {
+    	 
+    	 try {
+    		 while(true) {
+    			 buffer.consume();
+    			 Thread.sleep(1000);
+    		 }
+    	 } catch(Exception e) {
+    		 System.out.println("Error while processing consumer " + Thread.currentThread().getName());
+    	 }
+    	 
+     }
+}
+```
+
+# 4. Print numbers in order using N threads:
+
+```java
+package com.test;
+
+import java.time.LocalTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+class AlternativeNumbers {
+	
+	private int i=1;
+	private final int limit;
+	
+	public AlternativeNumbers(int limit) {
+		this.limit = limit;
+	}
+	
+	public synchronized void evenNumber() throws InterruptedException {
+		try {
+			while(i <= limit) {
+				
+				while(i % 2 != 0)
+					wait();
+				
+				if(i > limit) {
+					notifyAll();
+					break;
+				}
+				
+				System.out.println(Thread.currentThread().getName() +" : " + i++);
+				notifyAll();
+			}
+		} catch(InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		 
+	}
+	
+	public synchronized void oddNumber() throws InterruptedException {
+		
+		try {
+			while(i <= limit) {
+				
+				while(i % 2 == 0)
+					wait();
+				
+				if(i > limit) {
+					notifyAll();
+					break;
+				}
+				
+				System.out.println(Thread.currentThread().getName() + " : " + i++);
+				notifyAll();
+			}
+		} catch(InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		
+		 
+	}
+}
+ 
+
+public class TestThread {
+	 
+	public static void main(String[] args) throws InterruptedException {
+		
+		AlternativeNumbers AltNum = new AlternativeNumbers(20);
+		
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		
+		executor.submit(()-> {
+			try {
+				AltNum.oddNumber();
+			} catch(InterruptedException e) {}		 
+		});
+		
+		executor.submit(()-> {
+			try {
+				AltNum.evenNumber();
+			} catch(InterruptedException e) {}		 
+		});		 
+		
+		executor.shutdown();
+		 	 
+	}
+
+}
+
 ```
 
