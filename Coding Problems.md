@@ -628,6 +628,530 @@ Request allowed of pool-1-thread-3
 			
 ```
 
-# 8.
-# 9.
+# 8. User-Based Token Bucket Rate Limiter:
+- ConcurrentHashMap for per-user buckets
+- ReentrantLock for thread safety
+- ExecutorService for concurrent requests
+
+```java
+package com.test;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
+
+class TokenBucket {
+	
+	private final long capacity;
+	private final long refillRatePerSec;
+	private long token;
+	private long lastRefillTime;
+	
+	private final ReentrantLock lock = new ReentrantLock();
+	
+	TokenBucket(long cap, long refillRate) {
+		this.capacity = cap;
+		this.refillRatePerSec = refillRate;
+		this.token = cap;
+		this.lastRefillTime = System.nanoTime();
+	}
+	
+	public boolean allowRequest() throws InterruptedException {	
+		lock.lock();
+		try {
+			refillToken();
+			if(token>0) {
+				token--;
+				return true;
+			}
+			
+		} finally {
+			lock.unlock();
+		}
+		
+		return false;
+	}
+	
+	public void refillToken() {
+		
+		long now = System.nanoTime();
+		long passedTime = (now - lastRefillTime) / 1000000000;
+		
+		long newToken = passedTime * refillRatePerSec;
+		
+		if(newToken > 0) {
+			token = Math.min(capacity, token+newToken);
+			lastRefillTime = System.nanoTime();
+			
+		}	
+	}
+		
+}
+
+class UserRateLimiter {
+	
+	private final long capacity;
+	private final long refillRate;
+	
+	private final ConcurrentHashMap<String, TokenBucket> userBucket = new ConcurrentHashMap<>();
+	
+	public UserRateLimiter(long cap, long refillRate) {
+		this.capacity =  cap;
+		this.refillRate = refillRate;
+	}
+	
+	public boolean allowRequest(String userId) throws InterruptedException {
+		
+		TokenBucket bucket = userBucket.computeIfAbsent(userId, id -> new TokenBucket(capacity, refillRate));
+		return bucket.allowRequest();
+	}
+	
+}
+
+public class UserRateLimiterExample {
+	
+	public static void main(String[] args) {
+		
+		UserRateLimiter limiter = new UserRateLimiter(3, 2);
+		
+		String[] users = {"user1", "user2", "user3"};
+		
+		ExecutorService executor = Executors.newFixedThreadPool(5);
+		
+		for(int i=0; i<30; i++) {
+			
+			final String userId = users[i%users.length];
+			executor.submit(()-> {
+				try {	
+					boolean allowed = limiter.allowRequest(userId);
+					System.out.println(Thread.currentThread().getName()+ " | " + userId + " | " + (allowed ? "Allowed" : "Rejected"));
+					Thread.sleep(300);
+					 
+				} catch (InterruptedException e) {
+	                Thread.currentThread().interrupt();
+	            } 
+				
+			});
+		}	 
+		
+		executor.shutdown();
+	}
+
+}
+
+**Posible Output:**
+
+pool-1-thread-3 | user3 | Allowed
+pool-1-thread-1 | user1 | Allowed
+pool-1-thread-2 | user2 | Allowed
+pool-1-thread-4 | user1 | Allowed
+pool-1-thread-5 | user2 | Allowed
+pool-1-thread-2 | user3 | Allowed
+pool-1-thread-3 | user1 | Allowed
+pool-1-thread-1 | user2 | Allowed
+pool-1-thread-4 | user3 | Allowed
+pool-1-thread-5 | user1 | Rejected
+pool-1-thread-2 | user3 | Rejected
+pool-1-thread-3 | user2 | Rejected
+pool-1-thread-1 | user1 | Rejected
+pool-1-thread-4 | user2 | Rejected
+pool-1-thread-5 | user3 | Rejected
+pool-1-thread-2 | user1 | Rejected
+pool-1-thread-4 | user3 | Rejected
+pool-1-thread-1 | user1 | Rejected
+pool-1-thread-3 | user2 | Rejected
+pool-1-thread-5 | user2 | Rejected
+pool-1-thread-2 | user3 | Allowed
+pool-1-thread-4 | user1 | Allowed
+pool-1-thread-1 | user3 | Allowed
+pool-1-thread-3 | user2 | Allowed
+pool-1-thread-5 | user1 | Allowed
+pool-1-thread-2 | user2 | Allowed
+pool-1-thread-4 | user3 | Rejected
+pool-1-thread-3 | user1 | Rejected
+pool-1-thread-1 | user2 | Rejected
+pool-1-thread-5 | user3 | Rejected
+```
+
+# 9. Dinning Philoshper Problem:
+The Dining Philosophers Problem is one of the most famous synchronization problems in Operating Systems and Java multithreading interviews.  
+
+It demonstrates how multiple threads compete for limited resources and how improper locking can lead to deadlock, starvation, and resource contention.  
+
+- **Problem Statement**  
+    - 5 philosophers are sitting around a circular dining table.
+    - Between every pair of philosophers there is one fork.
+    - Therefore there are 5 philosophers and 5 forks.
+
+- **Each philosopher repeatedly:**  
+    - Thinks
+    - Gets hungry
+    - Picks up left fork
+    - Picks up right fork
+    - Eats
+    - Puts down both forks
+
+- **Constraint**  
+A philosopher needs both forks to eat.
+
+**Solution:**  
+Here's a complete Dining Philosophers implementation using ExecutorService and ReentrantLock.tryLock().  
+
+This version avoids deadlock because a philosopher only eats if both forks are acquired; otherwise, it releases any acquired fork and tries again later.
+
+```java
+package com.test;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReentrantLock;
+
+class Philosopher {
+	
+	private int id;
+	private ReentrantLock leftFork;
+	private ReentrantLock rightFork;
+	
+	Philosopher(int id, ReentrantLock left, ReentrantLock right) {
+		this.id = id;
+		this.leftFork = left;
+		this.rightFork = right;
+	}
+	
+	public void dine() throws InterruptedException {
+		
+		try {
+			
+			while(!Thread.currentThread().isInterrupted()) { //Keep running until someone interrupts this thread.
+				
+				think();
+				
+				if(leftFork.tryLock()) { // Unlike: leftFork.lock(); --> which waits forever, leftFork.tryLock(); --> returns immediately:	
+					
+					try {
+						System.out.println("Philosopher " + id + " is picked left fork !!!");	
+						
+						if(rightFork.tryLock()) {
+							
+							try {
+								System.out.println("Philosopher " + id + " is picked right fork !!!");
+								eat();
+							} finally {
+								rightFork.unlock();
+								System.out.println("Philosopher " + id + " is released right fork!!!");
+							}
+						}
+					} finally {
+						leftFork.unlock();
+						System.out.println("Philosopher " + id + " is released left fork !!!");
+					}
+				
+				}
+			}
+			Thread.sleep(100);
+		} catch(InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+			 	
+		
+	}
+	
+	public void think() throws InterruptedException {	
+		System.out.println("Philosopher "+ id + " is thinking !!!");
+		Thread.sleep(1000);	
+	}
+	
+	public void eat() throws InterruptedException{
+		System.out.println("Philosopher " + id + " is eating !!!");
+		Thread.sleep(500);
+	}
+}
+
+public class DinningPhilosopher{
+	
+	public static void main(String[] args) throws InterruptedException{
+		
+		int philosopherCount = 5;
+		ReentrantLock[] fork = new ReentrantLock[philosopherCount];
+		
+		for(int i=0; i<philosopherCount; i++)
+			fork[i] = new ReentrantLock();
+		
+		ExecutorService executor = Executors.newFixedThreadPool(philosopherCount);
+		
+		for(int i=0; i<philosopherCount; i++) {
+			
+			Philosopher philosopher = new Philosopher(i, fork[i], fork[(i+1)%philosopherCount]);
+			
+			executor.submit(() -> {
+				try {
+					philosopher.dine();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			});		
+			
+		}
+		
+		Thread.sleep(10000);	 
+		executor.shutdownNow();
+		
+		System.out.println("Dinner is over");
+	}
+
+}
+
+**Posible Output:**
+
+Philosopher 0 is thinking !!!
+Philosopher 1 is thinking !!!
+Philosopher 4 is thinking !!!
+Philosopher 2 is thinking !!!
+Philosopher 3 is thinking !!!
+Philosopher 1 is picked left fork !!!
+Philosopher 4 is picked left fork !!!
+Philosopher 0 is picked left fork !!!
+Philosopher 2 is picked left fork !!!
+Philosopher 0 is picked right fork !!!
+Philosopher 4 is released left fork !!!
+Philosopher 1 is released left fork !!!
+Philosopher 4 is thinking !!!
+Philosopher 0 is eating !!!
+Philosopher 2 is picked right fork !!!
+Philosopher 1 is thinking !!!
+Philosopher 2 is eating !!!
+Philosopher 3 is thinking !!!
+Philosopher 0 is released right fork!!!
+Philosopher 0 is released left fork !!!
+Philosopher 2 is released right fork!!!
+Philosopher 0 is thinking !!!
+Philosopher 2 is released left fork !!!
+Philosopher 2 is thinking !!!
+Dinner is over
+```
+
+# 10.  Custom Thread Pool:
+
+```java
+package com.test;
+
+import java.util.LinkedList;
+import java.util.Queue;
+
+class CustomThreadPool {
+	
+	private final WorkerThread[] workers;
+	private final Queue<Runnable> taskQueue;
+	
+	private volatile boolean isShutdown = false;  // volatile keyword ensures that changes made to a variable by one thread are immediately visible to all other threads.
+	
+	public CustomThreadPool(int poolSize) {
+		
+		workers = new WorkerThread[poolSize];
+		taskQueue = new LinkedList<>();
+		
+		for(int i=0; i<poolSize; i++) {
+			workers[i] = new WorkerThread();
+			workers[i].start();
+		}
+	}
+	
+	public void submit(Runnable task) {		
+		synchronized(taskQueue) {
+			if(isShutdown) {
+				throw new IllegalStateException("Thread pool is shutdown");
+			}
+			taskQueue.offer(task);
+			taskQueue.notifyAll();
+		}
+		
+	}
+	
+	public void shutdown() {
+		synchronized(taskQueue) {
+			isShutdown = true;	
+			taskQueue.notifyAll();
+		}	 
+	}
+	
+	public class WorkerThread extends Thread {
+		
+		@Override
+		public void run() {
+			
+			while(true) {				
+				Runnable task;
+				synchronized(taskQueue) {
+					while(taskQueue.isEmpty() && !isShutdown) {
+						try {
+							taskQueue.wait();
+						} catch (InterruptedException e) {
+							 Thread.currentThread().interrupt();
+							 return;
+						}
+					}
+					if(isShutdown && taskQueue.isEmpty()) {
+						System.out.println(Thread.currentThread().getName() + " stopped");
+						return;
+					}
+					task = taskQueue.poll();
+				}	 	
+				try {
+					task.run();
+				} catch(Exception e) {
+					e.printStackTrace();
+				}
+			}
+			
+		}
+		
+	}
+	
+}
+ 
+
+public class ThreadPoolExample {
+	
+  public static void main(String[] args) throws InterruptedException {
+	  
+	  CustomThreadPool pool = new CustomThreadPool(3);
+	  
+	  for(int i=1; i<=10; i++) {
+		  int taskId = i;
+		  pool.submit(()-> {
+			  System.out.println(Thread.currentThread().getName() + " Executed task " + taskId);
+			  try {
+				  Thread.sleep(500);
+			  } catch(InterruptedException e) {
+				  Thread.currentThread().interrupt();
+			  }
+		  });
+	  }
+	  
+	  Thread.sleep(5000);
+	  pool.shutdown();
+	  System.out.println("Thread pool shutdown initiated");
+	  
+  }	 
+
+}
+```
+
+# 11. Read-Write Lock Implementation
+
+```java
+package com.test;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+class ReaderWriterLock {
+	
+	private int reader = 0;
+	private int writer = 0;
+	private int writeRequest = 0;
+	
+	public synchronized void lockRead() throws InterruptedException {
+		while(writer > 0 || writeRequest > 0)
+			wait();
+		
+		reader++;
+	}
+	
+	public synchronized void unlockRead() {
+		reader--;
+		notifyAll();
+	}
+	
+	public synchronized void lockWrite() throws InterruptedException {
+		writeRequest++;
+		while(writer > 0 || reader > 0)
+			wait();
+		
+		writeRequest--;
+		writer++;
+	}
+	
+	public synchronized void unlockWrite() {
+		writer--;
+		notifyAll();
+	}
+	
+}
+
+class ManipulatingSection {
+	
+	private int data = 0;	
+	ReaderWriterLock lock = new ReaderWriterLock();
+	
+	public void read() {
+		boolean locked = false;
+		try {
+			lock.lockRead();
+			locked = true;
+			System.out.println(Thread.currentThread().getName() + " Reading Value: " + data);
+			Thread.sleep(500);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} finally {
+			if(locked)
+				lock.unlockRead();
+		}
+	}
+	
+	public void write(int val) {
+		boolean locked = false;
+		try {
+			lock.lockWrite();
+			locked = true;
+			System.out.println(Thread.currentThread().getName() + " Writing Value: " + val);
+			data = val;
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} finally {
+			if(locked)
+				lock.unlockWrite();
+		}
+	}
+	
+}
+
+class ReaderWriterExample {
+	
+public static void main(String[] args) throws InterruptedException {
+		
+	ManipulatingSection resource = new ManipulatingSection();
+		
+		ExecutorService executor = Executors.newFixedThreadPool(4);
+		
+		for(int i=0; i<3; i++) {	 
+			executor.submit(()-> {
+				System.out.println("Reader Thread - " + Thread.currentThread().getName());
+				for(int j=1; j<=3; j++) {
+					resource.read(); 		
+				}
+					 		 
+			});
+		}
+		
+		executor.submit(()-> {
+			System.out.println("Writer Thread - " + Thread.currentThread().getName());
+			for(int i=1; i<=3; i++) {
+				resource.write(i*10);
+			}
+		});
+		
+		Thread.sleep(5000);
+		
+		executor.shutdown();
+		
+	}
+
+}
+```
+
+ 
 
