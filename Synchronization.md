@@ -87,7 +87,7 @@ A critical section is the portion of code that accesses shared resources. and On
 
 ## Java provides synchronization using:
 
-1. Synchronized Method: Entire method is locked.
+**1. Synchronized Method:** Entire method is locked.
 - Ex:
 ```java
 class Counter {
@@ -111,7 +111,7 @@ class Counter {
 Every Java object has a "Monitor Lock" and When thread enters synchronized code Acquire Lock, Execute Code, Release Lock means Only one thread can hold monitor lock at a time.
 
 
-2. Synchronized Block:
+**2. Synchronized Block:**
 Instead of locking whole method, lock only required code.
 - Ex:
 ```java
@@ -133,7 +133,7 @@ Only database update is locked.
 - Reduced lock duration
 - More concurrency
 
-3. Static Synchronization:
+**3. Static Synchronization:**
 Static synchronization is used when multiple threads need to access a static (class-level) resource safely.
 A static synchronized method acquires the Class-level lock, not the object lock.
 
@@ -155,7 +155,7 @@ B enters
 Here, if we use simple synchronization then multiple objects of Bank class can use by multiple thread and as it will be instance level lock then multiple thread can manipulate transactionCount and we loss data consistancy.
 
 
-4. Lock Interface:
+**4. Lock Interface:**
 More flexible than synchronized.
 - Ex:
 ```java
@@ -224,7 +224,7 @@ class Example {
 ```
 Same thread entering synchronized methods repeatedly is allowed.
 
-5. Semaphore:
+**5. Semaphore:**
 Controls number of threads accessing a resource.
 
 - Ex.
@@ -249,7 +249,7 @@ finally {
     3. Resource management
 
 
-6. Atomic Variables:
+**6. Atomic Variables:**
 They provide thread-safe operations without using synchronized blocks or explicit locks.
 Think of them as:
 Variables that can be updated safely by multiple threads using low-level CPU operations.
@@ -282,7 +282,7 @@ AtomicReference
     4. Lock-free programming is sufficient.
 
 
-7. Volatile Keyword:
+**7. Volatile Keyword:**
 volatile provides visibility, but not atomicity.
 
 - Why Do We Need Volatile?
