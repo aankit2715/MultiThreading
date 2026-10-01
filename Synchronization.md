@@ -249,12 +249,12 @@ finally {
     3. Resource management
 
 
-**6. Atomic Variables:**
+**6. Atomic Variables and CAS:**
 They provide thread-safe operations without using synchronized blocks or explicit locks.
 Think of them as:
 Variables that can be updated safely by multiple threads using low-level CPU operations.
 
-- Example:
+Ex.
 ```java
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -270,16 +270,41 @@ class Counter {
 ```
 Now multiple threads can update safely without explicit locking.
 
-AtomicInteger
-AtomicLong
-AtomicBoolean
+```java
+AtomicInteger:
+AtomicInteger count = new AtomicInteger();
+		
+AtomicLong:
+AtomicLong counter = new AtomicLong();
+		
+AtomicBoolean:
+AtomicBoolean flag = new AtomicBoolean(false);
+
 AtomicReference
+AtomicReference<String> ref = new AtomicReference<>("Hello");
+```
 
 - When to use Atomic Variables?
     1. A single variable is shared by multiple threads.
     2. Operations like increment/decrement must be thread-safe.
     3. You want better performance than synchronized.
     4. Lock-free programming is sufficient.
+
+
+- What is CAS?
+**CAS means:** (Compare And Swap) or (Compare And Set), CAS is a special CPU instruction and CAS operation itself is atomic at the CPU/hardware level.
+
+```java
+It works like:
+If value == expected
+   update value
+Else
+   fail then retry
+```   
+
+- compareAndSet(expected, newValue):
+The read may happen simultaneously in multiple threads.
+What makes it safe is that the "Compare-And-Set" operation is atomic, so only one thread can successfully change a value from a specific old value to a new value. All other threads whose expectation became stale must retry with the latest value.
 
 
 **7. Volatile Keyword:**
