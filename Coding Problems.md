@@ -360,3 +360,159 @@ public class TestThread {
 
 ```
 
+# 5. Race Condition:
+
+```java
+package com.test;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+public class RaceConditionExample {
+	
+	private static int counter=0;
+	
+	public static void main(String[] args) throws InterruptedException{
+		
+		ExecutorService executor = Executors.newFixedThreadPool(4);
+		
+		executor.submit(() -> increment());
+		executor.submit(() -> increment());
+		executor.submit(() -> increment());
+		executor.submit(() -> increment());
+		
+		// Don't accept any new tasks, but let the already submitted tasks finish.
+		executor.shutdown();
+		
+		// Main thread, wait up to 1 minute for all executor tasks to complete.
+		executor.awaitTermination(1, TimeUnit.MINUTES);
+		
+		System.out.println("Final Counter: " + counter);
+	}
+	
+	public static void increment() {	
+		for(int i=0; i<20000; i++)
+			counter++;	
+	}
+
+}
+```
+
+# 6. How to make Singleton threads safe?
+- Singleton: A Singleton is a design pattern that ensures:
+	1. Only one instance of a class is created.
+	2. That instance is globally accessible throughout the application.
+	
+- Why use Singleton?
+Common use cases:
+	1. Logger
+	2. Configuration manager
+	3. Cache manager
+	4. Database connection pool manager
+	5. Application-wide settings
+	
+- Example:
+```java
+public class Singleton {
+
+    private static Singleton instance;
+
+    private Singleton() {
+        // private constructor prevents object creation using new
+    }
+
+    public static Singleton getInstance() {
+        if (instance == null) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+}
+```
+
+- Why is the above Singleton not thread-safe?  
+Imagine two threads, Thread A and Thread B, call getInstance() at exactly the same time.
+
+**Initially:**  
+instance = null  
+
+**Thread A executes:**  
+if(instance == null)  
+
+Condition is true. Before Thread A creates the object, CPU switches to Thread B.
+
+**Thread B executes:**  
+if(instance == null)  
+
+Condition is still true. Now Thread B creates an object;  
+instance = new Singleton();  
+
+CPU switches back to Thread A. Thread A also creates another object:  
+instance = new Singleton();  
+
+**Result:**  
+Singleton object 1  
+Singleton object 2  
+Two different objects are created, which violates the Singleton principle.  
+
+- How to make it thread-safe?
+Example:
+```java
+package com.test;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+class Singleton {
+	
+	private static Singleton instance;
+	
+	private Singleton() {
+		System.out.println("Singleton Instance Created by " + Thread.currentThread().getName());
+	}
+	
+	public static Singleton getInstance() throws InterruptedException {
+		if(instance == null) {
+			Thread.sleep(2000);
+			instance = new Singleton();
+		}  
+		
+		return instance;
+	}
+}
+
+public class SingletonExample {
+	
+	public static void main(String[] args) throws Exception{
+		
+		ExecutorService executor = Executors.newFixedThreadPool(3);
+		
+		for(int i=0; i<3; i++) {
+				executor.submit(() -> {
+					try {
+						Singleton singleton = Singleton.getInstance();
+						System.out.println(Thread.currentThread().getName() + " : " + singleton.hashCode());
+					} catch(Exception e) {}	 
+					
+				});				
+		}
+		
+		executor.shutdown();		 
+	}
+}
+
+Posible Output:
+Singleton Instance Created by pool-1-thread-3
+pool-1-thread-3 : 68884669
+Singleton Instance Created by pool-1-thread-2
+pool-1-thread-2 : 1739213138
+Singleton Instance Created by pool-1-thread-1
+pool-1-thread-1 : 2128527197
+```  
+In above example, we just need to make getInstance() thread safe and will able to achive threads safe singleton pattern.
+
+# 7.
+# 8.
+# 9.
+
