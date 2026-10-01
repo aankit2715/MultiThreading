@@ -292,7 +292,7 @@ AtomicReference<String> ref = new AtomicReference<>("Hello");
 
 
 - What is CAS?
-**CAS means:** (Compare And Swap) or (Compare And Set), CAS is a special CPU instruction and CAS operation itself is atomic at the CPU/hardware level.
+CAS means: (Compare And Swap) or (Compare And Set), CAS is a special CPU instruction and CAS operation itself is atomic at the CPU/hardware level.
 
 ```java
 It works like:
@@ -303,7 +303,8 @@ Else
 ```   
 
 - compareAndSet(expected, newValue):
-The read may happen simultaneously in multiple threads.
+The read may happen simultaneously in multiple threads.  
+
 What makes it safe is that the "Compare-And-Set" operation is atomic, so only one thread can successfully change a value from a specific old value to a new value. All other threads whose expectation became stale must retry with the latest value.
 
 
