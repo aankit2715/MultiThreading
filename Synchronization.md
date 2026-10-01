@@ -304,7 +304,6 @@ Else
 
 - compareAndSet(expected, newValue):
 The read may happen simultaneously in multiple threads.  
-
 What makes it safe is that the "Compare-And-Set" operation is atomic, so only one thread can successfully change a value from a specific old value to a new value. All other threads whose expectation became stale must retry with the latest value.
 
 
